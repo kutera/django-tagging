@@ -487,7 +487,7 @@ class Tag(models.Model):
     objects = TagManager()
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        if self.site is None and force_update==False:
+        if self.site_id is None and force_update==False:
             self.site = settings.SITE_ID
         super().save(force_insert, force_update, using, update_fields)
 
