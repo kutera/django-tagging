@@ -15,6 +15,8 @@ from tagging.utils import get_queryset_and_model
 from tagging.utils import get_tag_list
 from tagging.utils import parse_tag_input
 
+from django.contrib.sites.models import Site
+from django.contrib.sites.managers import CurrentSiteManager
 
 qn = connection.ops.quote_name
 
@@ -31,7 +33,7 @@ class TagManager(models.Manager):
         """
         ctype = ContentType.objects.get_for_model(obj)
         current_tags = list(self.filter(items__content_type__pk=ctype.pk,
-                                        items__object_id=obj.pk))
+                                        items__object_id=str(obj.pk)))
         updated_tag_names = parse_tag_input(tag_names)
         if settings.FORCE_LOWERCASE_TAGS:
             updated_tag_names = [t.lower() for t in updated_tag_names]
@@ -42,7 +44,7 @@ class TagManager(models.Manager):
         if len(tags_for_removal):
             TaggedItem._default_manager.filter(
                 content_type__pk=ctype.pk,
-                object_id=obj.pk,
+                object_id=str(obj.pk),
                 tag__in=tags_for_removal).delete()
         # Add new tags
         current_tag_names = [tag.name for tag in current_tags]
@@ -51,7 +53,7 @@ class TagManager(models.Manager):
                 tag, created = self.get_or_create(name=tag_name)
                 TaggedItem._default_manager.get_or_create(
                     content_type_id=ctype.pk,
-                    object_id=obj.pk,
+                    object_id=str(obj.pk),
                     tag=tag,
                 )
 
@@ -72,7 +74,7 @@ class TagManager(models.Manager):
         tag, created = self.get_or_create(name=tag_name)
         ctype = ContentType.objects.get_for_model(obj)
         TaggedItem._default_manager.get_or_create(
-            tag=tag, content_type=ctype, object_id=obj.pk)
+            tag=tag, content_type=ctype, object_id=str(obj.pk))
 
     def get_for_object(self, obj):
         """
@@ -81,7 +83,7 @@ class TagManager(models.Manager):
         """
         ctype = ContentType.objects.get_for_model(obj)
         return self.filter(items__content_type__pk=ctype.pk,
-                           items__object_id=obj.pk)
+                           items__object_id=str(obj.pk))
 
     def _get_usage(self, model, counts=False, min_count=None,
                    extra_joins=None, extra_criteria=None, params=None):
@@ -277,6 +279,8 @@ class TagManager(models.Manager):
                                          min_count=min_count))
         return calculate_cloud(tags, steps, distribution)
 
+class OnSiteTagManager(CurrentSiteManager, TagManager):
+    pass
 
 class TaggedItemManager(models.Manager):
     """
@@ -450,7 +454,7 @@ class TaggedItemManager(models.Manager):
         }
 
         cursor = connection.cursor()
-        params = [obj.pk]
+        params = [str(obj.pk)]
         if num is not None:
             params.append(num)
         cursor.execute(query, params)
@@ -473,6 +477,10 @@ class Tag(models.Model):
     """
     A tag.
     """
+    if hasattr(settings,'SITE_ID'):
+        site = models.ForeignKey(Site, on_delete=models.CASCADE, editable=False)
+        on_site = OnSiteTagManager
+
     name = models.CharField(
         _('name'), max_length=settings.MAX_TAG_LENGTH,
         unique=True, db_index=True)
@@ -503,9 +511,8 @@ class TaggedItem(models.Model):
         verbose_name=_('content type'),
         on_delete=models.CASCADE)
 
-    object_id = models.PositiveIntegerField(
-        _('object id'),
-        db_index=True)
+    # Object id can be a charfield or uuid, 
+    object_id = models.CharField(max_length=100, verbose_name=_('Object Key'), db_index=True)
 
     object = GenericForeignKey(
         'content_type', 'object_id')
