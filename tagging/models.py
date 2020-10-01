@@ -477,7 +477,7 @@ class Tag(models.Model):
     """
     A tag.
     """
-    site = models.ForeignKey(Site, on_delete=models.CASCADE, editable=False)
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, editable=False )
     on_site = OnSiteTagManager
 
     name = models.CharField(
@@ -485,6 +485,11 @@ class Tag(models.Model):
         unique=True, db_index=True)
 
     objects = TagManager()
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.site is None and force_update==False:
+            self.site = settings.SITE_ID
+        super().save(force_insert, force_update, using, update_fields)
 
     class Meta:
         ordering = ('name',)
