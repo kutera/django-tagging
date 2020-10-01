@@ -477,9 +477,8 @@ class Tag(models.Model):
     """
     A tag.
     """
-    if hasattr(settings,'SITE_ID'):
-        site = models.ForeignKey(Site, on_delete=models.CASCADE, editable=False)
-        on_site = OnSiteTagManager
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, editable=False)
+    on_site = OnSiteTagManager
 
     name = models.CharField(
         _('name'), max_length=settings.MAX_TAG_LENGTH,
